@@ -91,6 +91,7 @@ class WindowAttention(nn.Module):
 
         if self.relative_pos_embedding:
             self.relative_indices = get_relative_distances(window_size) + window_size - 1
+            # self.relative_indices = self.relative_indices.type(torch.long)
             self.pos_embedding = nn.Parameter(torch.randn(2 * window_size - 1, 2 * window_size - 1))
         else:
             self.pos_embedding = nn.Parameter(torch.randn(window_size ** 2, window_size ** 2))
@@ -185,7 +186,8 @@ class StageModule(nn.Module):
             ]))
 
     def forward(self, x):
-        x = self.patch_partition(x)
+        x = self.patch_partition(x) 
+        #  stage1:[1,3,224,224] => [1, 56, 56, 96] patch partition + linear 3*224*224=56*56*48(48=4*4*3一个patch的数字数量)
         for regular_block, shifted_block in self.layers:
             x = regular_block(x)
             x = shifted_block(x)
@@ -215,13 +217,13 @@ class SwinTransformer(nn.Module):
             nn.Linear(hidden_dim * 8, num_classes)
         )
 
-    def forward(self, img):
-        x = self.stage1(img)
-        x = self.stage2(x)
-        x = self.stage3(x)
-        x = self.stage4(x)
-        x = x.mean(dim=[2, 3])
-        return self.mlp_head(x)
+    def forward(self, img): #[1,3,224,224]
+        x = self.stage1(img) #[1,96,56,56]
+        x = self.stage2(x) #[1,192,28,28]
+        x = self.stage3(x) # [1, 384,14,14]
+        x = self.stage4(x) # [1, 768, 7, 7]
+        x = x.mean(dim=[2, 3]) #[1,768]
+        return self.mlp_head(x) # [1,3]
 
 
 def swin_t(hidden_dim=96, layers=(2, 2, 6, 2), heads=(3, 6, 12, 24), **kwargs):
